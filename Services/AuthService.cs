@@ -18,7 +18,8 @@ public class AuthService(
     UserManager<AppUser> userManager,
     IEmailService emailService,
     IAuditLogService auditLogService,
-    IConfiguration configuration) : IAuthService
+    IConfiguration configuration,
+    IOtpService otpService) : IAuthService
 {
     private readonly IUserRepository _userRepo = userRepo;
     private readonly JwtSettings _jwtSettings = jwtSettings.Value;
@@ -26,9 +27,177 @@ public class AuthService(
     private readonly IEmailService _emailService = emailService;
     private readonly IAuditLogService _audit = auditLogService;
     private readonly IConfiguration _config = configuration;
+    private readonly IOtpService _otpService = otpService;
+
+    #region SUPERCELL_ID_LIKE_AUTH
+
+    /// <summary>
+    /// Request OTP for login (Supercell ID-like)
+    /// </summary>
+    public async Task RequestLoginOtpAsync(LoginDto dto, string ipAddress)
+    {
+        var user = await _userManager.FindByEmailAsync(dto.Email);
+        if (user == null)
+        {
+            await _audit.LogAsync(null, "RequestLoginOtp", "Failed", "UserNotFound", ipAddress);
+            throw new Exception("Invalid email address.");
+        }
+
+        if (!await _userManager.IsEmailConfirmedAsync(user))
+        {
+            await _audit.LogAsync(user.Id, "RequestLoginOtp", "Failed", "EmailNotConfirmed", ipAddress);
+            throw new Exception("Email not confirmed. Please register first.");
+        }
+
+        var otpRequest = new RequestOtpDto
+        {
+            Email = dto.Email,
+            Purpose = "login"
+        };
+
+        await _otpService.RequestOtpAsync(otpRequest);
+        await _audit.LogAsync(user.Id, "RequestLoginOtp", "Success", null, ipAddress);
+    }
+
+    /// <summary>
+    /// Login with OTP (Supercell ID-like)
+    /// </summary>
+    public async Task<AuthResponseDto?> LoginWithOtpAsync(LoginWithOtpDto dto, string ipAddress)
+    {
+        var user = await _userManager.FindByEmailAsync(dto.Email);
+        if (user == null)
+        {
+            await _audit.LogAsync(null, "LoginWithOtp", "Failed", "UserNotFound", ipAddress);
+            throw new Exception("Invalid email address.");
+        }
+
+        // Check if account is locked
+        if (await _userManager.IsLockedOutAsync(user))
+        {
+            await _audit.LogAsync(user.Id, "LoginWithOtp", "Failed", "AccountLocked", ipAddress);
+            throw new Exception("Account is locked. Try again later.");
+        }
+
+        // Verify OTP
+        var otpVerify = new VerifyOtpDto
+        {
+            Email = dto.Email,
+            Code = dto.OtpCode,
+            Purpose = "login"
+        };
+
+        var isOtpValid = await _otpService.VerifyOtpAsync(otpVerify);
+        if (!isOtpValid)
+        {
+            await _userManager.AccessFailedAsync(user);
+            await _audit.LogAsync(user.Id, "LoginWithOtp", "Failed", "InvalidOtp", ipAddress);
+            throw new Exception("Invalid or expired OTP code.");
+        }
+
+        // Reset failed attempts on successful login
+        await _userManager.ResetAccessFailedCountAsync(user);
+        await _audit.LogAsync(user.Id, "LoginWithOtp", "Success", null, ipAddress);
+
+        return await GenerateToken(user);
+    }
+
+    /// <summary>
+    /// Request OTP for registration (Supercell ID-like)
+    /// </summary>
+    public async Task RequestRegisterOtpAsync(RegisterDto dto, string ipAddress)
+    {
+        // Check if user already exists
+        var existingUser = await _userManager.FindByEmailAsync(dto.Email);
+        if (existingUser != null)
+        {
+            await _audit.LogAsync(existingUser.Id, "RequestRegisterOtp", "Failed", "UserAlreadyExists", ipAddress);
+            throw new Exception("An account with this email already exists.");
+        }
+
+        var otpRequest = new RequestOtpDto
+        {
+            Email = dto.Email,
+            Purpose = "register"
+        };
+
+        await _otpService.RequestOtpAsync(otpRequest);
+        await _audit.LogAsync(null, "RequestRegisterOtp", "Success", dto.Email, ipAddress);
+    }
+
+    /// <summary>
+    /// Register with OTP and username (Supercell ID-like)
+    /// </summary>
+    public async Task<AuthResponseDto?> RegisterWithOtpAsync(RegisterWithOtpDto dto, string ipAddress)
+    {
+        // Check if user already exists
+        var existingUser = await _userManager.FindByEmailAsync(dto.Email);
+        if (existingUser != null)
+        {
+            await _audit.LogAsync(existingUser.Id, "RegisterWithOtp", "Failed", "UserAlreadyExists", ipAddress);
+            throw new Exception("An account with this email already exists.");
+        }
+
+        // Check if username is already taken
+        var userWithUsername = await _userManager.FindByNameAsync(dto.UserName);
+        if (userWithUsername != null)
+        {
+            await _audit.LogAsync(null, "RegisterWithOtp", "Failed", "UsernameAlreadyExists", ipAddress);
+            throw new Exception("This username is already taken. Please choose another one.");
+        }
+
+        // Verify OTP
+        var otpVerify = new VerifyOtpDto
+        {
+            Email = dto.Email,
+            Code = dto.OtpCode,
+            Purpose = "register"
+        };
+
+        var isOtpValid = await _otpService.VerifyOtpAsync(otpVerify);
+        if (!isOtpValid)
+        {
+            await _audit.LogAsync(null, "RegisterWithOtp", "Failed", "InvalidOtp", ipAddress);
+            throw new Exception("Invalid or expired OTP code.");
+        }
+
+        // Create user with auto-generated password (since we don't use passwords in Supercell ID-like auth)
+        var user = new AppUser
+        {
+            UserName = dto.UserName,
+            Email = dto.Email,
+            DisplayName = dto.UserName,
+            EmailConfirmed = true // Auto-confirm email since OTP was verified
+        };
+
+        // Generate a random password since Identity requires one
+        var randomPassword = GenerateRandomPassword();
+        var result = await _userRepo.CreateAsync(user, randomPassword);
+
+        if (!result.Succeeded)
+        {
+            await _audit.LogAsync(null, "RegisterWithOtp", "Failed",
+                string.Join(", ", result.Errors.Select(e => e.Description)), ipAddress);
+            throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
+        }
+
+        await _audit.LogAsync(user.Id, "RegisterWithOtp", "Success", null, ipAddress);
+        return await GenerateToken(user);
+    }
+
+    /// <summary>
+    /// Generate a random password for users (since we don't use passwords in Supercell ID-like auth)
+    /// </summary>
+    private string GenerateRandomPassword()
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+        var random = new Random();
+        return new string([.. Enumerable.Repeat(chars, 16).Select(s => s[random.Next(s.Length)])]);
+    }
+
+    #endregion
 
     #region REGISTER
-    public async Task<string> RegisterAsync(RegisterDto dto, string ipAddress)
+    public async Task<string> RegisterAsync(LegacyRegisterDto dto, string ipAddress)
     {
         var user = new AppUser
         {
@@ -135,7 +304,7 @@ public class AuthService(
     #endregion
 
     #region  LOGIN
-    public async Task<AuthResponseDto?> LoginAsync(LoginDto dto, string ipAddress)
+    public async Task<AuthResponseDto?> LoginAsync(LegacyLoginDto dto, string ipAddress)
     {
         var user = await _userManager.FindByEmailAsync(dto.Email);
         if (user == null)

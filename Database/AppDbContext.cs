@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<Game> Games => Set<Game>();
     public DbSet<UserGameData> UserGamedata => Set<UserGameData>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

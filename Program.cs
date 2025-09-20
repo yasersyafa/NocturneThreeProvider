@@ -74,12 +74,14 @@ builder.Services.AddAutoMapper(typeof(Program));
 // Add repositories to the container.
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IOtpRepository, OtpRepository>();
 
 // Add services to the container.
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IOtpService, OtpService>();
 
 // Add API Versioning.
 builder.Services.AddApiVersioning(options =>

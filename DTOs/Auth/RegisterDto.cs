@@ -6,17 +6,18 @@ public class RegisterDto
 {
     [Required, EmailAddress, MaxLength(255)]
     public string Email { get; set; } = string.Empty;
+}
 
-    [Required, MaxLength(64)]
-    // Min 8, harus ada: 1 huruf besar, 1 huruf kecil, 1 digit, 1 simbol
-    [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$",
-        ErrorMessage = "Password must be ≥8 chars and include upper, lower, digit, and symbol.")]
-    public string Password { get; set; } = string.Empty;
+public class RegisterWithOtpDto
+{
+    [Required, EmailAddress, MaxLength(255)]
+    public string Email { get; set; } = string.Empty;
 
-    [Required, Compare(nameof(Password))]
-    public string ConfirmPassword { get; set; } = string.Empty;
+    [Required, Length(6, 6)]
+    public string OtpCode { get; set; } = string.Empty;
 
-    // Nama tampilan di game
-    [Required, MinLength(3), MaxLength(10)]
-    public string DisplayName { get; set; } = string.Empty;
+    // Nama tampilan di game (username)
+    [Required, MinLength(3), MaxLength(20)]
+    [RegularExpression(@"^[a-zA-Z0-9_]+$", ErrorMessage = "Username can only contain letters, numbers, and underscores.")]
+    public string UserName { get; set; } = string.Empty;
 }

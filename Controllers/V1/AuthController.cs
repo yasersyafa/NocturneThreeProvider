@@ -14,10 +14,50 @@ public class AuthController(IAuthService authService) : ControllerBase
     private readonly IAuthService _authService = authService;
 
     /// <summary>
-    /// Register user baru dan mengembalikan token verifikasi email.
+    /// Request OTP for registration (Supercell ID-like)
+    /// </summary>
+    [HttpPost("register/request-otp")]
+    public async Task<IActionResult> RequestRegisterOtp([FromBody] RegisterDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        var ipAddress = HttpContext.GetIpAddress();
+        
+        try
+        {
+            await _authService.RequestRegisterOtpAsync(dto, ipAddress);
+            return Ok(new { Message = "OTP code sent to your email. Please check your inbox." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Complete registration with OTP and username (Supercell ID-like)
+    /// </summary>
+    [HttpPost("register/verify-otp")]
+    public async Task<IActionResult> RegisterWithOtp([FromBody] RegisterWithOtpDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        var ipAddress = HttpContext.GetIpAddress();
+        
+        try
+        {
+            var response = await _authService.RegisterWithOtpAsync(dto, ipAddress);
+            return Ok(new { Message = "Registration successful!", Data = response });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Register user baru dan mengembalikan token verifikasi email (Legacy method).
     /// </summary>
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterDto dto)
+    public async Task<IActionResult> Register([FromBody] LegacyRegisterDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var ipAddress = HttpContext.GetIpAddress();
@@ -40,10 +80,50 @@ public class AuthController(IAuthService authService) : ControllerBase
     }
 
     /// <summary>
-    /// Login user (hanya bisa jika email sudah diverifikasi).
+    /// Request OTP for login (Supercell ID-like)
+    /// </summary>
+    [HttpPost("login/request-otp")]
+    public async Task<IActionResult> RequestLoginOtp([FromBody] LoginDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        var ipAddress = HttpContext.GetIpAddress();
+        
+        try
+        {
+            await _authService.RequestLoginOtpAsync(dto, ipAddress);
+            return Ok(new { Message = "OTP code sent to your email. Please check your inbox." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Login with OTP (Supercell ID-like)
+    /// </summary>
+    [HttpPost("login/verify-otp")]
+    public async Task<IActionResult> LoginWithOtp([FromBody] LoginWithOtpDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        var ipAddress = HttpContext.GetIpAddress();
+        
+        try
+        {
+            var response = await _authService.LoginWithOtpAsync(dto, ipAddress);
+            return Ok(new { Message = "Login successful!", Data = response });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Login user (hanya bisa jika email sudah diverifikasi) (Legacy method).
     /// </summary>
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginDto dto)
+    public async Task<IActionResult> Login([FromBody] LegacyLoginDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var ipAddress = HttpContext.GetIpAddress();
