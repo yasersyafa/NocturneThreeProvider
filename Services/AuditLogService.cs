@@ -8,16 +8,6 @@ public class AuditLogService(IAuditLogRepository repo) : IAuditLogService
 {
     private readonly IAuditLogRepository _repo = repo;
 
-    public async Task GetAllAsync()
-    {
-        await _repo.GetAllAsync();
-    }
-
-    public async Task GetByUserAsync(string userId)
-    {
-        await _repo.GetByUserAsync(userId);
-    }
-
     public async Task LogAsync(string? userId, string action, string status, string? reason, string? ipAddress)
     {
         var log = new AuditLog

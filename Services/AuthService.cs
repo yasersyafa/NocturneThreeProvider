@@ -12,14 +12,17 @@ using NocturneThreeProvider.Settings;
 
 namespace NocturneThreeProvider.Services;
 
-public class AuthService(IUserRepository userRepo, IOptions<JwtSettings> jwtSettings, UserManager<AppUser> userManager, IEmailService emailService) : IAuthService
+public class AuthService(IUserRepository userRepo, IOptions<JwtSettings> jwtSettings, UserManager<AppUser> userManager, IEmailService emailService, IAuditLogService auditLogService, IConfiguration configuration) : IAuthService
 {
     private readonly IUserRepository _userRepo = userRepo;
     private readonly JwtSettings _jwtSettings = jwtSettings.Value;
     private readonly UserManager<AppUser> _userManager = userManager;
     private readonly IEmailService _emailService = emailService;
+    private readonly IAuditLogService _audit = auditLogService;
+    private readonly IConfiguration _config = configuration;
 
-    public async Task<string> RegisterAsync(RegisterDto dto)
+    #region REGISTER
+    public async Task<string> RegisterAsync(RegisterDto dto, string ipAddress)
     {
         var user = new AppUser
         {
@@ -30,7 +33,12 @@ public class AuthService(IUserRepository userRepo, IOptions<JwtSettings> jwtSett
 
         var result = await _userRepo.CreateAsync(user, dto.Password);
         if (!result.Succeeded)
+        {
+            await _audit.LogAsync(null, "Register", "Failed",
+                string.Join(", ", result.Errors.Select(e => e.Description)), ipAddress);
+
             throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
+        }
 
         // generate token
         var token = await _userRepo.GenerateEmailConfirmationTokenAsync(user);
@@ -39,34 +47,68 @@ public class AuthService(IUserRepository userRepo, IOptions<JwtSettings> jwtSett
         // create confrim url
         var confirmUrl = $"http://localhost:5161/api/v1/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
 
+        // logs
+        await _audit.LogAsync(user.Id, "Register", "Success", null, ipAddress);
+        // generate token for email
         await _emailService.SendEmailAsync(user.Email, user.DisplayName ?? user.UserName ?? "", confirmUrl);
-        // for testing purpose, use console
+        // for testing purpose returning token to response
         return token;
     }
+    #endregion
 
-    public async Task<bool> ConfirmEmailAsync(string userId, string token)
+    #region  CONFIRM_EMAIL
+    public async Task<IdentityResult> ConfirmEmailAsync(string userId, string token, string ipAddress)
     {
         var user = await _userManager.FindByIdAsync(userId);
-        if (user == null) return false;
+        if (user == null)
+        {
+            await _audit.LogAsync(null, "ConfirmEmail", "Failed", "UserNotFound", ipAddress);
+            return IdentityResult.Failed(new IdentityError { Description = "User not found." });
+        }
 
-        var result = await _userRepo.ConfirmEmailAsync(user, token);
-        return result.Succeeded;
+        var result = await _userManager.ConfirmEmailAsync(user, token);
+
+        if (!result.Succeeded)
+        {
+            await _audit.LogAsync(user.Id, "ConfirmEmail", "Failed", "InvalidToken", ipAddress);
+        }
+        else
+        {
+            await _audit.LogAsync(user.Id, "ConfirmEmail", "Success", null, ipAddress);
+        }
+
+        return result;
     }
+    #endregion
 
-    public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
+    #region  LOGIN
+    public async Task<AuthResponseDto?> LoginAsync(LoginDto dto, string ipAddress)
     {
-        var user = await _userRepo.FindByEmailAsync(dto.Email);
-        if (user == null) return null;
+        var user = await _userManager.FindByEmailAsync(dto.Email);
+        if (user == null)
+        {
+            await _audit.LogAsync(null, "Login", "Failed", "UserNotFound", ipAddress);
+            throw new Exception("Invalid login attempt.");
+        }
 
-        if (!user.EmailConfirmed)
-            throw new Exception("Email not verified");
+        if (!await _userManager.CheckPasswordAsync(user, dto.Password))
+        {
+            await _audit.LogAsync(user.Id, "Login", "Failed", "WrongPassword", ipAddress);
+            throw new Exception("Invalid login attempt.");
+        }
 
-        var validPassword = await _userRepo.CheckPasswordAsync(user, dto.Password);
-        if (!validPassword) return null;
+        if (!await _userManager.IsEmailConfirmedAsync(user))
+        {
+            await _audit.LogAsync(user.Id, "Login", "Failed", "EmailNotConfirmed", ipAddress);
+            throw new Exception("Email not confirmed.");
+        }
 
+        await _audit.LogAsync(user.Id, "Login", "Success", null, ipAddress);
+
+        // generate JWT (bisa dipisah ke JwtService biar lebih clean)
         return GenerateToken(user);
     }
-
+    #endregion
     private AuthResponseDto GenerateToken(AppUser user)
     {
         var claims = new List<Claim>
