@@ -1,8 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using NocturneThreeProvider.Models;
 using NocturneThreeProvider.Services.Interfaces;
 
 namespace NocturneThreeProvider.Controllers.V1;

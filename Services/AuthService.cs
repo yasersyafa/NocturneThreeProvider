@@ -177,27 +177,35 @@ public class AuthService(
         await _audit.LogAsync(user.Id, "Login", "Success", null, ipAddress);
 
         // generate JWT (bisa dipisah ke JwtService biar lebih clean)
-        return GenerateToken(user);
+        return await GenerateToken(user);
     }
     #endregion
 
     #region CUSTOM_FUNCTIONS
-    private AuthResponseDto GenerateToken(AppUser user)
+    private async Task<AuthResponseDto> GenerateToken(AppUser user)
     {
-        var claims = new List<Claim>
+        var userClaims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id),
-            new(JwtRegisteredClaimNames.Email, user.Email!)
+            new(JwtRegisteredClaimNames.Email, user.Email!),
+            new(ClaimTypes.NameIdentifier, user.Id)
         };
+
+        var expire = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiredInMinutes);
+
+        var roles = await _userManager.GetRolesAsync(user);
+        foreach (var role in roles)
+        {
+            userClaims.Add(new Claim(ClaimTypes.Role, role));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expire = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiredInMinutes);
 
         var token = new JwtSecurityToken(
             issuer: _jwtSettings.Issuer,
             audience: _jwtSettings.Audience,
-            claims: claims,
+            claims: userClaims,
             expires: expire,
             signingCredentials: creds
         );
