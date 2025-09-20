@@ -12,7 +12,13 @@ using NocturneThreeProvider.Settings;
 
 namespace NocturneThreeProvider.Services;
 
-public class AuthService(IUserRepository userRepo, IOptions<JwtSettings> jwtSettings, UserManager<AppUser> userManager, IEmailService emailService, IAuditLogService auditLogService, IConfiguration configuration) : IAuthService
+public class AuthService(
+    IUserRepository userRepo,
+    IOptions<JwtSettings> jwtSettings,
+    UserManager<AppUser> userManager,
+    IEmailService emailService,
+    IAuditLogService auditLogService,
+    IConfiguration configuration) : IAuthService
 {
     private readonly IUserRepository _userRepo = userRepo;
     private readonly JwtSettings _jwtSettings = jwtSettings.Value;
@@ -81,6 +87,36 @@ public class AuthService(IUserRepository userRepo, IOptions<JwtSettings> jwtSett
     }
     #endregion
 
+    #region RESET_PASSWORD
+    public async Task RequestPasswordResetAsync(ResetPasswordRequestDto dto, string ipAddress)
+    {
+        var user = await _userManager.FindByEmailAsync(dto.Email);
+
+        if (user == null)
+        {
+            // Jangan bocorin info user tidak ada → tetap return success
+            await _audit.LogAsync(null, "ResetPasswordRequest", "Ignored", "EmailNotFound", ipAddress);
+            return;
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+        var baseUrl = _config["App:BaseUrl"] ?? "https://localhost:5161";
+        var resetUrl = $"{baseUrl}/api/v1/auth/reset-password/confirm?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+
+        await _emailService.SendResetPasswordEmailAsync(user.Email!, user.DisplayName ?? user.UserName ?? "", resetUrl);
+
+        await _audit.LogAsync(user.Id, "ResetPasswordRequest", "Success", null, ipAddress);
+    }
+    #endregion
+
+    #region CONFIRM_PASSWORD
+    public Task<bool> ConfirmPasswordResetAsync(ResetPasswordConfirmDto dto, string ipAddress)
+    {
+        throw new NotImplementedException();
+    }
+    #endregion
+
     #region  LOGIN
     public async Task<AuthResponseDto?> LoginAsync(LoginDto dto, string ipAddress)
     {
@@ -127,6 +163,8 @@ public class AuthService(IUserRepository userRepo, IOptions<JwtSettings> jwtSett
         return GenerateToken(user);
     }
     #endregion
+
+    #region CUSTOM_FUNCTIONS
     private AuthResponseDto GenerateToken(AppUser user)
     {
         var claims = new List<Claim>
@@ -157,4 +195,5 @@ public class AuthService(IUserRepository userRepo, IOptions<JwtSettings> jwtSett
             Roles = [.. _userManager.GetRolesAsync(user).Result]
         };
     }
+    #endregion
 }

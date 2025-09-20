@@ -52,4 +52,18 @@ public class AuthController(IAuthService authService) : ControllerBase
 
         return Ok(response);
     }
+
+    /// <summary>
+    /// Reset password
+    /// </summary>
+    /// <param name="dto"></param>
+    /// <returns></returns> 
+    [HttpPost("reset-password/request")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RequestPasswordReset([FromBody] ResetPasswordRequestDto dto)
+    {
+        var ipAddress = HttpContext.GetIpAddress();
+        await _authService.RequestPasswordResetAsync(dto, ipAddress);
+        return Ok(new { message = "If an account exists with that email, a reset link has been sent." });
+    }
 }
