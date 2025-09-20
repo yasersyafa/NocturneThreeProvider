@@ -1,0 +1,53 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.log
+*.cache
+*.obj
+*.pdb
+*.tmp
+*.csproj.user
+*.resharper
+*.dotcover
+*.ncrunchsolution
+*.ncrunchproj
+
+# Build results
+[Bb]in/
+[Oo]bj/
+[Tt]est[Rr]esults/
+
+# NuGet packages
+packages/
+*.nupkg
+
+# ENV files
+.env
+
+# Miscellaneous
+*.exe
+*.dll
+*.pdb
+*.mdb
+*.sbr
+*.bsc
+*.lib
+*.ncb
+*.opendb
+*.aps
+*.manifest
+*.res
+*.bak
+*.old
+*.ilk
+*.idb
+*.ipch
+
+# OS-generated files
+.DS_Store
+ehthumbs.db
+Icon?
+Thumbs.db
+
+build/
