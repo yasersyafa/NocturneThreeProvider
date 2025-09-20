@@ -91,11 +91,29 @@ public class AuthService(IUserRepository userRepo, IOptions<JwtSettings> jwtSett
             throw new Exception("Invalid login attempt.");
         }
 
+        // cek lockout status
+        if (await _userManager.IsLockedOutAsync(user))
+        {
+            await _audit.LogAsync(user.Id, "Login", "Failed", "AccountLocked", ipAddress);
+            throw new Exception("Account is locked. Try again later.");
+        }
+
         if (!await _userManager.CheckPasswordAsync(user, dto.Password))
         {
+            // increment fail count
+            await _userManager.AccessFailedAsync(user);
+
+            if (await _userManager.IsLockedOutAsync(user))
+            {
+                await _audit.LogAsync(user.Id, "Login", "Failed", "AccountLocked", ipAddress);
+                throw new Exception("Account is locked. Try again after 15 minutes.");
+            }
+
             await _audit.LogAsync(user.Id, "Login", "Failed", "WrongPassword", ipAddress);
             throw new Exception("Invalid login attempt.");
         }
+
+        await _userManager.ResetAccessFailedCountAsync(user);
 
         if (!await _userManager.IsEmailConfirmedAsync(user))
         {
