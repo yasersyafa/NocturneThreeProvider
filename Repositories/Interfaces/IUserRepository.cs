@@ -11,4 +11,9 @@ public interface IUserRepository
 
     Task<string> GenerateEmailConfirmationTokenAsync(AppUser user);
     Task<IdentityResult> ConfirmEmailAsync(AppUser user, string token);
+
+    #region AUTHORIZE_FUNCTIONS
+    Task<AppUser?> GetByIdAsync(string userId);
+    Task<IList<string>> GetRolesAsync(AppUser user);
+    #endregion
 }

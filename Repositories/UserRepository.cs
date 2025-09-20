@@ -32,4 +32,16 @@ public class UserRepository(UserManager<AppUser> userManager) : IUserRepository
     {
         return _userManager.ConfirmEmailAsync(user, token);
     }
+
+    #region AUTHORIZE_IMPLEMENTATIONS
+    public async Task<AppUser?> GetByIdAsync(string userId)
+    {
+        return await _userManager.FindByIdAsync(userId);
+    }
+
+    public async Task<IList<string>> GetRolesAsync(AppUser user)
+    {
+        return await _userManager.GetRolesAsync(user);
+    }
+    #endregion
 }

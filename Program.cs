@@ -75,6 +75,7 @@ builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 // Add API Versioning.
 builder.Services.AddApiVersioning(options =>
