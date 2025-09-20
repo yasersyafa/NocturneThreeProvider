@@ -4,15 +4,20 @@ using NocturneThreeProvider.Services.Interfaces;
 
 namespace NocturneThreeProvider.Services;
 
-public class AuditLogService : IAuditLogService
+public class AuditLogService(IAuditLogRepository repo) : IAuditLogService
 {
-    private readonly IAuditLogRepository _repo;
+    private readonly IAuditLogRepository _repo = repo;
 
-    public AuditLogService(IAuditLogRepository repo)
+    public async Task GetAllAsync()
     {
-        _repo = repo;
+        await _repo.GetAllAsync();
     }
-    
+
+    public async Task GetByUserAsync(string userId)
+    {
+        await _repo.GetByUserAsync(userId);
+    }
+
     public async Task LogAsync(string? userId, string action, string status, string? reason, string? ipAddress)
     {
         var log = new AuditLog
