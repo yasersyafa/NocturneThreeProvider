@@ -54,7 +54,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     }
 
     /// <summary>
-    /// Reset password
+    /// Reset password via email
     /// </summary>
     /// <param name="dto"></param>
     /// <returns></returns> 
@@ -65,5 +65,18 @@ public class AuthController(IAuthService authService) : ControllerBase
         var ipAddress = HttpContext.GetIpAddress();
         await _authService.RequestPasswordResetAsync(dto, ipAddress);
         return Ok(new { message = "If an account exists with that email, a reset link has been sent." });
+    }
+
+    [HttpPost("reset-password/confirm")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ConfirmPasswordReset([FromBody] ResetPasswordConfirmDto dto)
+    {
+        var ipAddress = HttpContext.GetIpAddress();
+        var result = await _authService.ConfirmPasswordResetAsync(dto, ipAddress);
+
+        if (!result)
+            return BadRequest(new { message = "Reset password failed. Token may be invalid or expired." });
+
+        return Ok(new { message = "Password has been reset successfully." });
     }
 }

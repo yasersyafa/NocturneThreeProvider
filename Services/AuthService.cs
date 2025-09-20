@@ -101,7 +101,7 @@ public class AuthService(
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
-        var baseUrl = _config["App:BaseUrl"] ?? "https://localhost:5161";
+        var baseUrl = _config["App:BaseUrl"] ?? "http://localhost:5161";
         var resetUrl = $"{baseUrl}/api/v1/auth/reset-password/confirm?userId={user.Id}&token={Uri.EscapeDataString(token)}";
 
         await _emailService.SendResetPasswordEmailAsync(user.Email!, user.DisplayName ?? user.UserName ?? "", resetUrl);
@@ -111,9 +111,26 @@ public class AuthService(
     #endregion
 
     #region CONFIRM_PASSWORD
-    public Task<bool> ConfirmPasswordResetAsync(ResetPasswordConfirmDto dto, string ipAddress)
+    public async Task<bool> ConfirmPasswordResetAsync(ResetPasswordConfirmDto dto, string ipAddress)
     {
-        throw new NotImplementedException();
+        var user = await _userManager.FindByIdAsync(dto.UserId);
+        if (user == null)
+        {
+            await _audit.LogAsync(null, "ResetPasswordConfirm", "Failed", "UserNotFound", ipAddress);
+            return false;
+        }
+
+        var result = await _userManager.ResetPasswordAsync(user, dto.Token, dto.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            await _audit.LogAsync(user.Id, "ResetPasswordConfirm", "Failed", errors, ipAddress);
+            return false;
+        }
+
+        await _audit.LogAsync(user.Id, "ResetPasswordConfirm", "Success", null, ipAddress);
+        return true;
     }
     #endregion
 
