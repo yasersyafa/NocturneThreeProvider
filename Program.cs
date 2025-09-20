@@ -29,6 +29,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
 {
     var identitySettings = config.GetSection("Identity").Get<IdentitySettings>()!;
+
+    // Lockout settings
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.MaxFailedAccessAttempts = 7;
+    options.Lockout.AllowedForNewUsers = true;
+
+    // Password settings
     options.Password.RequiredLength = identitySettings.RequiredLength;
     options.Password.RequireDigit = identitySettings.RequireDigit;
     options.Password.RequireUppercase = identitySettings.RequireUppercase;
@@ -62,10 +69,12 @@ builder.Services.AddAutoMapper(typeof(Program));
 
 // Add repositories to the container.
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
 // Add services to the container.
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 // Add API Versioning.
 builder.Services.AddApiVersioning(options =>
