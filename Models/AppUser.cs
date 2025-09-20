@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using System.ComponentModel.DataAnnotations;
 
 namespace NocturneThreeProvider.Models;
 
@@ -8,7 +9,10 @@ public class AppUser : IdentityUser
 
     // custom fields
     public string? AvatarUrl { get; set; }
-    public string? DisplayName { get; set; }
+    
+    [Required]
+    [MaxLength(50)]
+    public string DisplayName { get; set; } = string.Empty;
 
     // relation to game data
     public ICollection<UserGameData> GameData { get; set; } = [];

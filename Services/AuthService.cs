@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NocturneThreeProvider.DTOs.Auth;
@@ -145,6 +146,14 @@ public class AuthService(
             throw new Exception("This username is already taken. Please choose another one.");
         }
 
+        // Check if display name is already taken
+        var userWithDisplayName = await _userManager.Users.FirstOrDefaultAsync(u => u.DisplayName == dto.UserName);
+        if (userWithDisplayName != null)
+        {
+            await _audit.LogAsync(null, "RegisterWithOtp", "Failed", "DisplayNameAlreadyExists", ipAddress);
+            throw new Exception("This display name is already taken. Please choose another one.");
+        }
+
         // Verify OTP
         var otpVerify = new VerifyOtpDto
         {
@@ -199,6 +208,14 @@ public class AuthService(
     #region REGISTER
     public async Task<string> RegisterAsync(LegacyRegisterDto dto, string ipAddress)
     {
+        // Check if display name is already taken
+        var userWithDisplayName = await _userManager.Users.FirstOrDefaultAsync(u => u.DisplayName == dto.DisplayName);
+        if (userWithDisplayName != null)
+        {
+            await _audit.LogAsync(null, "Register", "Failed", "DisplayNameAlreadyExists", ipAddress);
+            throw new Exception("This display name is already taken. Please choose another one.");
+        }
+
         var user = new AppUser
         {
             UserName = dto.Email,

@@ -15,6 +15,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     {
         base.OnModelCreating(builder);
 
+        // Configure unique constraint for DisplayName
+        builder.Entity<AppUser>()
+            .HasIndex(u => u.DisplayName)
+            .IsUnique();
+
         builder.Entity<UserGameData>()
             .HasOne(ug => ug.User)
             .WithMany(u => u.GameData)
